@@ -117,7 +117,8 @@ func (s *store) Take(ctx context.Context, key string) (limit uint64, remaining u
 	// Get a client from the pool.
 	conn, ok := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
 	if !ok {
-		return 0, 0, 0, false, fmt.Errorf("pool is not a ConnWithContext")
+		retErr = fmt.Errorf("pool is not a ConnWithContext")
+		return
 	}
 	if err := conn.Err(); err != nil {
 		retErr = fmt.Errorf("connection is not usable: %w", err)
