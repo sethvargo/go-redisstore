@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/opencensus-integrations/redigo/redis"
 	"github.com/sethvargo/go-limiter"
 )
 
@@ -114,11 +114,7 @@ func (s *store) Take(ctx context.Context, key string) (limit uint64, remaining u
 	now := uint64(time.Now().UTC().UnixNano())
 
 	// Get a client from the pool.
-	conn, err := s.pool.GetContext(ctx)
-	if err != nil {
-		retErr = fmt.Errorf("failed to get connection from pool: %w", err)
-		return
-	}
+	conn := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
 	if err := conn.Err(); err != nil {
 		retErr = fmt.Errorf("connection is not usable: %w", err)
 		return
