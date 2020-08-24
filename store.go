@@ -2,12 +2,13 @@
 package redisstore
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"sync/atomic"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/opencensus-integrations/redigo/redis"
 	"github.com/sethvargo/go-limiter"
 )
 
@@ -109,8 +110,9 @@ func (s *store) Take(key string) (tokens uint64, remaining uint64, next uint64, 
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
 
+	ctx := context.Background()
 	// Get a client from the pool.
-	conn := s.pool.Get()
+	conn := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
 	if err := conn.Err(); err != nil {
 		return 0, 0, 0, false, fmt.Errorf("connection is not usable: %w", err)
 	}
