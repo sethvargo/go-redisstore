@@ -7,4 +7,7 @@
 This package provides a rate limiting interface in Go (Golang), using Redis. See
 [sethvargo/go-limiter][limiter] for more information.
 
+For an instrumented client, see the [opencensus branch][opencensus-branch].
+
 [limiter]: https://github.com/sethvargo/go-limiter
+[opencensus-branch]: https://github.com/sethvargo/go-redisstore/tree/opencensus
