@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/opencensus-integrations/redigo/redis"
 )
 
 func testKey(tb testing.TB) string {
