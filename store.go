@@ -2,6 +2,7 @@
 package redisstore
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"sync/atomic"
@@ -12,6 +13,7 @@ import (
 )
 
 var _ limiter.Store = (*store)(nil)
+var _ limiter.StoreWithContext = (*store)(nil)
 
 type store struct {
 	tokens    uint64
@@ -98,12 +100,18 @@ func NewWithPool(c *Config, pool *redis.Pool) (limiter.Store, error) {
 	return s, nil
 }
 
-// Take attempts to remove a token from the named key. If the take is
+// Take attempts to remove a token from the named key. See TakeWithContext for
+// more information.
+func (s *store) Take(key string) (tokens uint64, remaining uint64, next uint64, ok bool, retErr error) {
+	return s.TakeWithContext(context.Background(), key)
+}
+
+// TakeWithContext attempts to remove a token from the named key. If the take is
 // successful, it returns true, otherwise false. It also returns the configured
 // limit, remaining tokens, and reset time, if one was found. Any errors
 // connecting to the store or parsing the return value are considered failures
 // and fail the take.
-func (s *store) Take(key string) (tokens uint64, remaining uint64, next uint64, ok bool, retErr error) {
+func (s *store) TakeWithContext(ctx context.Context, key string) (tokens uint64, remaining uint64, next uint64, ok bool, retErr error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		return 0, 0, 0, false, limiter.ErrStopped
@@ -138,10 +146,20 @@ func (s *store) Take(key string) (tokens uint64, remaining uint64, next uint64, 
 	return s.tokens, tokens, next, ok, nil
 }
 
-// Close stops the memory limiter and cleans up any outstanding sessions. You
-// should absolutely always call Close() as it releases any open network
-// connections.
+// Close stops the limiter. See CloseWithContext for more information.
 func (s *store) Close() error {
+	if !atomic.CompareAndSwapUint32(&s.stopped, 0, 1) {
+		return nil
+	}
+
+	// Close the connection pool.
+	return s.pool.Close()
+}
+
+// CloseWithContext stops the memory limiter and cleans up any outstanding
+// sessions. You should always call CloseWithContext() as it releases any open
+// network connections.
+func (s *store) CloseWithContext(_ context.Context) error {
 	if !atomic.CompareAndSwapUint32(&s.stopped, 0, 1) {
 		return nil
 	}
