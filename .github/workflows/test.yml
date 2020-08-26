@@ -4,11 +4,13 @@ on:
   push:
     branches:
     - main
+    - opencensus
     tags:
     - '*'
   pull_request:
     branches:
     - main
+    - opencensus
 
 jobs:
   test:
