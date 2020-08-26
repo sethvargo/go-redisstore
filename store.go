@@ -105,12 +105,15 @@ func NewWithPool(c *Config, pool *redis.Pool) (limiter.Store, error) {
 // connecting to the store or parsing the return value are considered failures
 // and fail the take.
 func (s *store) Take(key string) (tokens uint64, remaining uint64, next uint64, ok bool, retErr error) {
+	return s.TakeWithContext(context.Background(), key)
+}
+
+func (s *store) TakeWithContext(ctx context.Context, key string) (tokens uint64, remaining uint64, next uint64, ok bool, retErr error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
 
-	ctx := context.Background()
 	// Get a client from the pool.
 	conn := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
 	if err := conn.Err(); err != nil {
@@ -125,7 +128,7 @@ func (s *store) Take(key string) (tokens uint64, remaining uint64, next uint64, 
 	now := uint64(time.Now().UTC().UnixNano())
 	nowStr := strconv.FormatUint(now, 10)
 
-	a, err := redis.Int64s(s.luaScript.Do(conn, key, nowStr))
+	a, err := redis.Int64s(s.luaScript.DoContext(ctx, conn, key, nowStr))
 	if err != nil {
 		retErr = fmt.Errorf("failed to EVAL script: %w", err)
 		return 0, 0, 0, false, retErr
