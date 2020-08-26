@@ -118,12 +118,15 @@ func (s *store) TakeWithContext(ctx context.Context, key string) (tokens uint64,
 	}
 
 	// Get a client from the pool.
-	conn := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
+	conn, ok := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
+	if !ok {
+		return 0, 0, 0, false, fmt.Errorf("pool is not a ConnWithContext")
+	}
 	if err := conn.Err(); err != nil {
 		return 0, 0, 0, false, fmt.Errorf("connection is not usable: %w", err)
 	}
 	defer func() {
-		if err := conn.Close(); err != nil {
+		if err := conn.CloseContext(ctx); err != nil {
 			retErr = fmt.Errorf("failed to close connection: %v, original error: %w", err, retErr)
 		}
 	}()
@@ -131,7 +134,7 @@ func (s *store) TakeWithContext(ctx context.Context, key string) (tokens uint64,
 	now := uint64(time.Now().UTC().UnixNano())
 	nowStr := strconv.FormatUint(now, 10)
 
-	a, err := redis.Int64s(s.luaScript.Do(conn, key, nowStr))
+	a, err := redis.Int64s(s.luaScript.DoContext(ctx, conn, key, nowStr))
 	if err != nil {
 		retErr = fmt.Errorf("failed to EVAL script: %w", err)
 		return 0, 0, 0, false, retErr
