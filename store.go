@@ -148,12 +148,7 @@ func (s *store) TakeWithContext(ctx context.Context, key string) (tokens uint64,
 
 // Close stops the limiter. See CloseWithContext for more information.
 func (s *store) Close() error {
-	if !atomic.CompareAndSwapUint32(&s.stopped, 0, 1) {
-		return nil
-	}
-
-	// Close the connection pool.
-	return s.pool.Close()
+	return s.CloseWithContext(context.Background())
 }
 
 // CloseWithContext stops the memory limiter and cleans up any outstanding
