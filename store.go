@@ -114,6 +114,7 @@ func (s *store) TakeWithContext(ctx context.Context, key string) (tokens uint64,
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
 
+	ctx := context.Background()
 	// Get a client from the pool.
 	conn := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
 	if err := conn.Err(); err != nil {
