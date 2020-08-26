@@ -114,7 +114,10 @@ func (s *store) Take(ctx context.Context, key string) (limit uint64, remaining u
 	now := uint64(time.Now().UTC().UnixNano())
 
 	// Get a client from the pool.
-	conn := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
+	conn, ok := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
+	if !ok {
+		return 0, 0, 0, false, fmt.Errorf("pool is not a ConnWithContext")
+	}
 	if err := conn.Err(); err != nil {
 		retErr = fmt.Errorf("connection is not usable: %w", err)
 		return
@@ -124,7 +127,7 @@ func (s *store) Take(ctx context.Context, key string) (limit uint64, remaining u
 	nowStr := strconv.FormatUint(now, 10)
 	tokensStr := strconv.FormatUint(s.tokens, 10)
 	intervalStr := strconv.FormatInt(s.interval.Nanoseconds(), 10)
-	a, err := redis.Int64s(s.luaScript.Do(conn, key, nowStr, tokensStr, intervalStr))
+	a, err := redis.Int64s(s.luaScript.DoContext(ctx, conn, key, nowStr, tokensStr, intervalStr))
 	if err != nil {
 		retErr = fmt.Errorf("failed to run script: %w", err)
 		return
