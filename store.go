@@ -48,7 +48,7 @@ type Config struct {
 
 // New uses a Redis instance to back a rate limiter that to limit the number of
 // permitted events over an interval.
-func New(c *Config) (limiter.Store, error) {
+func New(c *Config) (limiter.StoreWithContext, error) {
 	return NewWithPool(c, &redis.Pool{
 		MaxActive:   100,
 		IdleTimeout: 5 * time.Minute,
@@ -62,7 +62,7 @@ func New(c *Config) (limiter.Store, error) {
 
 // NewWithPool creates a new limiter using the given redis pool. Use this to
 // customize lower-level details about the pool.
-func NewWithPool(c *Config, pool *redis.Pool) (limiter.Store, error) {
+func NewWithPool(c *Config, pool *redis.Pool) (limiter.StoreWithContext, error) {
 	if c == nil {
 		c = new(Config)
 	}
