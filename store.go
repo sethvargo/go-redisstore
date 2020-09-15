@@ -4,7 +4,6 @@ package redisstore
 import (
 	"context"
 	"fmt"
-	"io"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -202,7 +201,7 @@ func (s *store) Close(_ context.Context) error {
 // closeConnection is a helper for closing the connection object. It is used in
 // defer statements to alter the provided error pointer before the final result
 // is bubbled up the stack.
-func closeConnection(c io.Closer, err *error) {
+func closeConnection(c redis.Conn, err *error) {
 	nerr := c.Close()
 	if *err == nil {
 		*err = nerr
