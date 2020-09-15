@@ -122,7 +122,7 @@ func (s *store) Take(ctx context.Context, key string) (limit uint64, remaining u
 		retErr = fmt.Errorf("connection is not usable: %w", err)
 		return
 	}
-	defer closeConnection(conn, &retErr)
+	defer closeConnection(ctx, conn, &retErr)
 
 	nowStr := strconv.FormatUint(now, 10)
 	tokensStr := strconv.FormatUint(s.tokens, 10)
@@ -151,21 +151,21 @@ func (s *store) Set(ctx context.Context, key string, tokens uint64, interval tim
 	}
 
 	// Get a client from the pool.
-	conn, err := s.pool.GetContext(ctx)
-	if err != nil {
-		retErr = fmt.Errorf("failed to get connection from pool: %w", err)
+	conn, ok := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
+	if !ok {
+		retErr = fmt.Errorf("pool is not a ConnWithContext")
 		return
 	}
 	if err := conn.Err(); err != nil {
 		retErr = fmt.Errorf("connection is not usable: %w", err)
 		return
 	}
-	defer closeConnection(conn, &retErr)
+	defer closeConnection(ctx, conn, &retErr)
 
 	// Set configuration on the key.
 	tokensStr := strconv.FormatUint(tokens, 10)
 	intervalStr := strconv.FormatInt(interval.Nanoseconds(), 10)
-	if err := conn.Send(cmdHSET, key,
+	if err := conn.SendContext(ctx, cmdHSET, key,
 		fieldTokens, tokensStr,
 		fieldMaxTokens, tokensStr,
 		fieldInterval, intervalStr,
@@ -176,7 +176,7 @@ func (s *store) Set(ctx context.Context, key string, tokens uint64, interval tim
 
 	// Set the key to expire. This will prevent a leak when a key's configuration
 	// is set, but nothing is ever taken from the bucket.
-	if err := conn.Send(cmdEXPIRE, key, weekSeconds); err != nil {
+	if err := conn.SendContext(ctx, cmdEXPIRE, key, weekSeconds); err != nil {
 		retErr = fmt.Errorf("failed to set expire on key: %w", err)
 		return
 	}
@@ -193,16 +193,16 @@ func (s *store) Burst(ctx context.Context, key string, tokens uint64) (retErr er
 	}
 
 	// Get a client from the pool.
-	conn, err := s.pool.GetContext(ctx)
-	if err != nil {
-		retErr = fmt.Errorf("failed to get connection from pool: %w", err)
+	conn, ok := s.pool.GetWithContext(ctx).(redis.ConnWithContext)
+	if !ok {
+		retErr = fmt.Errorf("pool is not a ConnWithContext")
 		return
 	}
 	if err := conn.Err(); err != nil {
 		retErr = fmt.Errorf("connection is not usable: %w", err)
 		return
 	}
-	defer closeConnection(conn, &retErr)
+	defer closeConnection(ctx, conn, &retErr)
 
 	// Set configuration on the key.
 	tokensStr := strconv.FormatUint(tokens, 10)
@@ -239,8 +239,8 @@ func (s *store) Close(_ context.Context) error {
 // closeConnection is a helper for closing the connection object. It is used in
 // defer statements to alter the provided error pointer before the final result
 // is bubbled up the stack.
-func closeConnection(c redis.Conn, err *error) {
-	nerr := c.Close()
+func closeConnection(ctx context.Context, c redis.ConnWithContext, err *error) {
+	nerr := c.CloseContext(ctx)
 	if *err == nil {
 		*err = nerr
 	}
