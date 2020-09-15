@@ -1,6 +1,7 @@
 package redisstore
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
@@ -23,12 +24,98 @@ func testKey(tb testing.TB) string {
 	return digest[:32]
 }
 
+func TestStore_Exercise(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	host := os.Getenv("REDIS_HOST")
+	if host == "" {
+		t.Fatal("missing REDIS_HOST")
+	}
+
+	port := os.Getenv("REDIS_PORT")
+	if port == "" {
+		port = "6379"
+	}
+
+	pass := os.Getenv("REDIS_PASS")
+
+	s, err := New(&Config{
+		Tokens:   5,
+		Interval: 3 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial("tcp", host+":"+port,
+				redis.DialPassword(pass))
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := s.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	key := testKey(t)
+
+	// Take with no key configuration - this should use the default values
+	{
+		limit, remaining, reset, ok, err := s.Take(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			t.Errorf("expected ok")
+		}
+		if got, want := limit, uint64(5); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := remaining, uint64(4); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := time.Until(time.Unix(0, int64(reset))), 3*time.Second; got > want {
+			t.Errorf("expected %v to less than %v", got, want)
+		}
+	}
+
+	// Now set a value
+	{
+		if err := s.Set(ctx, key, 11, 5*time.Second); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Take again, this should use the new values
+	{
+		limit, remaining, reset, ok, err := s.Take(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			t.Errorf("expected ok")
+		}
+		if got, want := limit, uint64(11); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := remaining, uint64(10); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := time.Until(time.Unix(0, int64(reset))), 5*time.Second; got > want {
+			t.Errorf("expected %v to less than %v", got, want)
+		}
+	}
+}
+
 func TestStore_Take(t *testing.T) {
 	t.Parallel()
 
 	if testing.Short() {
 		t.Skipf("skipping (short)")
 	}
+
+	ctx := context.Background()
 
 	host := os.Getenv("REDIS_HOST")
 	if host == "" {
@@ -73,7 +160,11 @@ func TestStore_Take(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer s.Close()
+			t.Cleanup(func() {
+				if err := s.Close(ctx); err != nil {
+					t.Fatal(err)
+				}
+			})
 
 			type result struct {
 				limit, remaining uint64
@@ -86,7 +177,7 @@ func TestStore_Take(t *testing.T) {
 			takeCh := make(chan *result, 2*tc.tokens)
 			for i := uint64(1); i <= 2*tc.tokens; i++ {
 				go func() {
-					limit, remaining, reset, ok, err := s.Take(key)
+					limit, remaining, reset, ok, err := s.Take(ctx, key)
 					takeCh <- &result{limit, remaining, time.Until(time.Unix(0, int64(reset))), ok, err}
 				}()
 			}
@@ -142,7 +233,7 @@ func TestStore_Take(t *testing.T) {
 			time.Sleep(tc.interval)
 
 			// Verify we can take once more
-			_, _, _, ok, err := s.Take(key)
+			_, _, _, ok, err := s.Take(ctx, key)
 			if err != nil {
 				t.Fatal(err)
 			}
