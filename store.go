@@ -22,9 +22,10 @@ const (
 	weekSeconds = 60 * 60 * 24 * 7
 
 	// Common Redis commands
-	cmdEXPIRE = "EXPIRE"
-	cmdHSET   = "HSET"
-	cmdPING   = "PING"
+	cmdEXPIRE  = "EXPIRE"
+	cmdHINCRBY = "HINCRBY"
+	cmdHSET    = "HSET"
+	cmdPING    = "PING"
 )
 
 var _ limiter.Store = (*store)(nil)
@@ -142,6 +143,7 @@ func (s *store) Take(ctx context.Context, key string) (limit uint64, remaining u
 	return
 }
 
+// Set sets the key's limit to the provided value and interval.
 func (s *store) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) (retErr error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
@@ -169,6 +171,43 @@ func (s *store) Set(ctx context.Context, key string, tokens uint64, interval tim
 		fieldMaxTokens, tokensStr,
 		fieldInterval, intervalStr,
 	); err != nil {
+		retErr = fmt.Errorf("failed to set key: %w", err)
+		return
+	}
+
+	// Set the key to expire. This will prevent a leak when a key's configuration
+	// is set, but nothing is ever taken from the bucket.
+	if err := conn.Send(cmdEXPIRE, key, weekSeconds); err != nil {
+		retErr = fmt.Errorf("failed to set expire on key: %w", err)
+		return
+	}
+
+	return
+}
+
+// Burst adds the given tokens to the key's bucket.
+func (s *store) Burst(ctx context.Context, key string, tokens uint64) (retErr error) {
+	// If the store is stopped, all requests are rejected.
+	if atomic.LoadUint32(&s.stopped) == 1 {
+		retErr = limiter.ErrStopped
+		return
+	}
+
+	// Get a client from the pool.
+	conn, err := s.pool.GetContext(ctx)
+	if err != nil {
+		retErr = fmt.Errorf("failed to get connection from pool: %w", err)
+		return
+	}
+	if err := conn.Err(); err != nil {
+		retErr = fmt.Errorf("connection is not usable: %w", err)
+		return
+	}
+	defer closeConnection(conn, &retErr)
+
+	// Set configuration on the key.
+	tokensStr := strconv.FormatUint(tokens, 10)
+	if err := conn.Send(cmdHINCRBY, key, fieldTokens, tokensStr); err != nil {
 		retErr = fmt.Errorf("failed to set key: %w", err)
 		return
 	}
