@@ -88,6 +88,9 @@ end
 local maxtokens = defmaxtokens
 if present(data[F_MAX]) then
 	maxtokens = tonumber(data[F_MAX])
+else
+	redis.call(C_HSET, key, F_MAX, defmaxtokens)
+	redis.call(C_EXPIRE, key, 30)
 end
 
 local tokens = maxtokens

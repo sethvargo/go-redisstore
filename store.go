@@ -24,6 +24,7 @@ const (
 	// Common Redis commands
 	cmdEXPIRE  = "EXPIRE"
 	cmdHINCRBY = "HINCRBY"
+	cmdHMGET   = "HMGET"
 	cmdHSET    = "HSET"
 	cmdPING    = "PING"
 )
@@ -140,6 +141,43 @@ func (s *store) Take(ctx context.Context, key string) (limit uint64, remaining u
 	}
 
 	limit, remaining, next, ok = uint64(a[0]), uint64(a[1]), uint64(a[2]), a[3] == 1
+	return
+}
+
+// Get gets the current limit and remaining tokens for the key. It does not
+// reduce or reset any counters.
+func (s *store) Get(ctx context.Context, key string) (limit, remaining uint64, retErr error) {
+	// If the store is stopped, all requests are rejected.
+	if atomic.LoadUint32(&s.stopped) == 1 {
+		retErr = limiter.ErrStopped
+		return
+	}
+
+	// Get a client from the pool.
+	conn, err := s.pool.GetContext(ctx)
+	if err != nil {
+		retErr = fmt.Errorf("failed to get connection from pool: %w", err)
+		return
+	}
+	if err := conn.Err(); err != nil {
+		retErr = fmt.Errorf("connection is not usable: %w", err)
+		return
+	}
+	defer closeConnection(conn, &retErr)
+
+	result, err := redis.Int64s(conn.Do(cmdHMGET, key, fieldMaxTokens, fieldTokens))
+	if err != nil {
+		retErr = fmt.Errorf("failed to get key: %w", err)
+		return
+	}
+
+	if got, want := len(result), 2; got != want {
+		retErr = fmt.Errorf("not enough keys returned, expected %d got %d", want, got)
+		return
+	}
+
+	limit = uint64(result[0])
+	remaining = uint64(result[1])
 	return
 }
 
