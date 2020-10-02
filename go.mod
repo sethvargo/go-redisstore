@@ -4,5 +4,5 @@ go 1.14
 
 require (
 	github.com/gomodule/redigo v1.8.2
-	github.com/sethvargo/go-limiter v0.5.2
+	github.com/sethvargo/go-limiter v0.6.0
 )
