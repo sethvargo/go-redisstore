@@ -17,8 +17,8 @@ github.com/opencensus-integrations/redigo v2.0.1+incompatible h1:1EbXlxudNBcuUYZ
 github.com/opencensus-integrations/redigo v2.0.1+incompatible/go.mod h1:iH5qq3BZppLeyPZP0Hy2qffpbcppAl58otmaERGeJaQ=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/sethvargo/go-limiter v0.5.2 h1:NIFp7xy3NyE2+mEHbengdLQF0C0STOpwF5Qw5JtayIs=
-github.com/sethvargo/go-limiter v0.5.2/go.mod h1:C0kbSFbiriE5k2FFOe18M1YZbAR2Fiwf72uGu0CXCcU=
+github.com/sethvargo/go-limiter v0.6.0 h1:186jmCdl1ItQUXbHFdTBrFSZztN6/bL9855C5jfMlKU=
+github.com/sethvargo/go-limiter v0.6.0/go.mod h1:C0kbSFbiriE5k2FFOe18M1YZbAR2Fiwf72uGu0CXCcU=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 go.opencensus.io v0.22.4 h1:LYy1Hy3MJdrCdMwwzxA/dRok4ejH+RwNGbuoD9fCjto=
