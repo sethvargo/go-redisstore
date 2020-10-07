@@ -43,17 +43,17 @@ end
 -- present returns true if the given value is not nil and is not the empty
 -- string.
 local present = function (val)
-	return val ~= nil and val ~= ''
+  return val ~= nil and val ~= ''
 end
 
 -- tick returns the total number of times the interval has occurred between
 -- start and current.
 local tick = function (start, curr, interval)
   local val = math.floor((curr - start) / interval)
-	if val > 0 then
-		return val
-	end
-	return 0
+  if val > 0 then
+    return val
+  end
+  return 0
 end
 
 -- ttl returns the appropriate ttl in seconds for the given interval, 3x the
@@ -71,57 +71,57 @@ local data = hgetall(key)
 
 local start = now
 if present(data[F_START]) then
-	start = tonumber(data[F_START])
+  start = tonumber(data[F_START])
 else
-	redis.call(C_HSET, key, F_START, now)
-	redis.call(C_EXPIRE, key, 30)
+  redis.call(C_HSET, key, F_START, now)
+  redis.call(C_EXPIRE, key, 30)
 end
 
 local lasttick = 0
 if present(data[F_TICK]) then
-	lasttick = tonumber(data[F_TICK])
+  lasttick = tonumber(data[F_TICK])
 else
-	redis.call(C_HSET, key, F_TICK, 0)
-	redis.call(C_EXPIRE, key, 30)
+  redis.call(C_HSET, key, F_TICK, 0)
+  redis.call(C_EXPIRE, key, 30)
 end
 
 local maxtokens = defmaxtokens
 if present(data[F_MAX]) then
-	maxtokens = tonumber(data[F_MAX])
+  maxtokens = tonumber(data[F_MAX])
 else
-	redis.call(C_HSET, key, F_MAX, defmaxtokens)
-	redis.call(C_EXPIRE, key, 30)
+  redis.call(C_HSET, key, F_MAX, defmaxtokens)
+  redis.call(C_EXPIRE, key, 30)
 end
 
 local tokens = maxtokens
 if present(data[F_TOKENS]) then
-	tokens = tonumber(data[F_TOKENS])
+  tokens = tonumber(data[F_TOKENS])
 end
 
 local interval = definterval
 if present(data[F_INTERVAL]) then
-	interval = tonumber(data[F_INTERVAL])
+  interval = tonumber(data[F_INTERVAL])
 end
 
 local currtick = tick(start, now, interval)
 local nexttime = start + ((currtick+1) * interval)
 
 if lasttick < currtick then
-	local rate = interval / tokens
+  local rate = interval / tokens
   tokens = availabletokens(lasttick, currtick, maxtokens, rate)
   lasttick = currtick
   redis.call(C_HSET, key,
-		F_START, start,
-		F_TICK, lasttick,
-		F_INTERVAL, interval,
-		F_TOKENS, tokens)
-	redis.call(C_EXPIRE, key, ttl(interval))
+    F_START, start,
+    F_TICK, lasttick,
+    F_INTERVAL, interval,
+    F_TOKENS, tokens)
+  redis.call(C_EXPIRE, key, ttl(interval))
 end
 
 if tokens > 0 then
   tokens = tokens - 1
   redis.call(C_HSET, key, F_TOKENS, tokens)
-	redis.call(C_EXPIRE, key, ttl(interval))
+  redis.call(C_EXPIRE, key, ttl(interval))
   return {maxtokens, tokens, nexttime, true}
 end
 
