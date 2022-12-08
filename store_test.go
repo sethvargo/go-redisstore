@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 func testKey(tb testing.TB) string {
@@ -31,7 +31,7 @@ func TestStore_Exercise(t *testing.T) {
 
 	host := os.Getenv("REDIS_HOST")
 	if host == "" {
-		t.Fatal("missing REDIS_HOST")
+		host = "127.0.0.1"
 	}
 
 	port := os.Getenv("REDIS_PORT")
@@ -44,9 +44,9 @@ func TestStore_Exercise(t *testing.T) {
 	s, err := New(&Config{
 		Tokens:   5,
 		Interval: 3 * time.Second,
-		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", host+":"+port,
-				redis.DialPassword(pass))
+		RedisOptions: &redis.Options{
+			Addr:     host + ":" + port,
+			Password: pass,
 		},
 	})
 	if err != nil {
@@ -214,7 +214,7 @@ func TestStore_Take(t *testing.T) {
 
 	host := os.Getenv("REDIS_HOST")
 	if host == "" {
-		t.Fatal("missing REDIS_HOST")
+		host = "127.0.0.1"
 	}
 
 	port := os.Getenv("REDIS_PORT")
@@ -247,9 +247,9 @@ func TestStore_Take(t *testing.T) {
 			s, err := New(&Config{
 				Interval: tc.interval,
 				Tokens:   tc.tokens,
-				Dial: func() (redis.Conn, error) {
-					return redis.Dial("tcp", host+":"+port,
-						redis.DialPassword(pass))
+				RedisOptions: &redis.Options{
+					Addr:     host + ":" + port,
+					Password: pass,
 				},
 			})
 			if err != nil {
