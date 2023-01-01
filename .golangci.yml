@@ -1,0 +1,64 @@
+run:
+  # default: ''
+  modules-download-mode: 'readonly'
+
+  # default: false
+  allow-parallel-runners: true
+
+linters:
+  enable:
+  - 'asasalint'
+  - 'asciicheck'
+  - 'bidichk'
+  - 'bodyclose'
+  - 'containedctx'
+  - 'depguard'
+  - 'durationcheck'
+  - 'errcheck'
+  - 'errchkjson'
+  - 'errname'
+  - 'errorlint'
+  - 'errorlint'
+  - 'exportloopref'
+  - 'gofmt'
+  - 'gofumpt'
+  - 'goheader'
+  - 'goimports'
+  - 'gomodguard'
+  - 'goprintffuncname'
+  - 'gosec'
+  - 'gosimple'
+  - 'govet'
+  - 'importas'
+  - 'ineffassign'
+  - 'ireturn'
+  - 'makezero'
+  - 'misspell'
+  - 'noctx'
+  - 'noctx'
+  - 'paralleltest'
+  - 'prealloc'
+  - 'predeclared'
+  - 'revive'
+  - 'sqlclosecheck'
+  - 'staticcheck'
+  - 'stylecheck'
+  - 'thelper'
+  - 'typecheck'
+  - 'unconvert'
+  - 'unused'
+  - 'whitespace'
+
+issues:
+  # default: []
+  exclude:
+
+  # default: 50
+  max-issues-per-linter: 0
+
+  # default: 3
+  max-same-issues: 0
+
+severity:
+  # default: ''
+  default-severity: 'error'

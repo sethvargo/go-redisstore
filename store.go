@@ -29,9 +29,9 @@ const (
 	cmdPING    = "PING"
 )
 
-var _ limiter.Store = (*store)(nil)
+var _ limiter.Store = (*Store)(nil)
 
-type store struct {
+type Store struct {
 	tokens    uint64
 	interval  time.Duration
 	pool      *redis.Pool
@@ -58,21 +58,21 @@ type Config struct {
 
 // New uses a Redis instance to back a rate limiter that to limit the number of
 // permitted events over an interval.
-func New(c *Config) (limiter.Store, error) {
+func New(c *Config) (*Store, error) {
 	return NewWithPool(c, &redis.Pool{
 		MaxActive:   100,
 		IdleTimeout: 5 * time.Minute,
 		Dial:        c.Dial,
 		TestOnBorrow: func(c redis.Conn, _ time.Time) error {
 			_, err := c.Do(cmdPING)
-			return err
+			return fmt.Errorf("failed to borrow: %w", err)
 		},
 	})
 }
 
 // NewWithPool creates a new limiter using the given redis pool. Use this to
 // customize lower-level details about the pool.
-func NewWithPool(c *Config, pool *redis.Pool) (limiter.Store, error) {
+func NewWithPool(c *Config, pool *redis.Pool) (*Store, error) {
 	if c == nil {
 		c = new(Config)
 	}
@@ -89,7 +89,7 @@ func NewWithPool(c *Config, pool *redis.Pool) (limiter.Store, error) {
 
 	luaScript := redis.NewScript(1, luaTemplate)
 
-	s := &store{
+	s := &Store{
 		tokens:    tokens,
 		interval:  interval,
 		pool:      pool,
@@ -103,7 +103,7 @@ func NewWithPool(c *Config, pool *redis.Pool) (limiter.Store, error) {
 // limit, remaining tokens, and reset time, if one was found. Any errors
 // connecting to the store or parsing the return value are considered failures
 // and fail the take.
-func (s *store) Take(ctx context.Context, key string) (limit uint64, remaining uint64, next uint64, ok bool, retErr error) {
+func (s *Store) Take(ctx context.Context, key string) (limit uint64, remaining uint64, next uint64, ok bool, retErr error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		retErr = limiter.ErrStopped
@@ -146,7 +146,7 @@ func (s *store) Take(ctx context.Context, key string) (limit uint64, remaining u
 
 // Get gets the current limit and remaining tokens for the key. It does not
 // reduce or reset any counters.
-func (s *store) Get(ctx context.Context, key string) (limit, remaining uint64, retErr error) {
+func (s *Store) Get(ctx context.Context, key string) (limit, remaining uint64, retErr error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		retErr = limiter.ErrStopped
@@ -182,7 +182,7 @@ func (s *store) Get(ctx context.Context, key string) (limit, remaining uint64, r
 }
 
 // Set sets the key's limit to the provided value and interval.
-func (s *store) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) (retErr error) {
+func (s *Store) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) (retErr error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		retErr = limiter.ErrStopped
@@ -224,7 +224,7 @@ func (s *store) Set(ctx context.Context, key string, tokens uint64, interval tim
 }
 
 // Burst adds the given tokens to the key's bucket.
-func (s *store) Burst(ctx context.Context, key string, tokens uint64) (retErr error) {
+func (s *Store) Burst(ctx context.Context, key string, tokens uint64) (retErr error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		retErr = limiter.ErrStopped
@@ -263,7 +263,7 @@ func (s *store) Burst(ctx context.Context, key string, tokens uint64) (retErr er
 // Close stops the memory limiter and cleans up any outstanding sessions. You
 // should always call CloseWithContext() as it releases any open network
 // connections.
-func (s *store) Close(_ context.Context) error {
+func (s *Store) Close(_ context.Context) error {
 	if !atomic.CompareAndSwapUint32(&s.stopped, 0, 1) {
 		return nil
 	}
