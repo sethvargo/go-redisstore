@@ -4,7 +4,6 @@ test:
 		-short \
 		-shuffle=on \
 		-timeout=5m \
-		-vet="${VETTERS}" \
 		./...
 .PHONY: test
 
@@ -14,6 +13,5 @@ test-acc:
 		-race \
 		-shuffle=on \
 		-timeout=10m \
-		-vet="${VETTERS}" \
 		./...
 .PHONY: test-acc
