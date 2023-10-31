@@ -29,12 +29,19 @@ const (
 	cmdPING    = "PING"
 )
 
+// Pool represents a redigo pool.
+type Pool interface {
+	Get() redis.Conn
+	GetContext(ctx context.Context) (redis.Conn, error)
+	Close() error
+}
+
 var _ limiter.Store = (*Store)(nil)
 
 type Store struct {
 	tokens    uint64
 	interval  time.Duration
-	pool      *redis.Pool
+	pool      Pool
 	luaScript *redis.Script
 
 	stopped uint32
@@ -72,7 +79,7 @@ func New(c *Config) (*Store, error) {
 
 // NewWithPool creates a new limiter using the given redis pool. Use this to
 // customize lower-level details about the pool.
-func NewWithPool(c *Config, pool *redis.Pool) (*Store, error) {
+func NewWithPool(c *Config, pool Pool) (*Store, error) {
 	if c == nil {
 		c = new(Config)
 	}
