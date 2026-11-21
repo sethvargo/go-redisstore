@@ -16,7 +16,12 @@ const (
 	// hash field keys shared by the Lua script.
 	fieldInterval  = "i"
 	fieldMaxTokens = "m"
+	fieldOrigin    = "o"
 	fieldTokens    = "k"
+
+	// originSet marks a key configured with Set, so that the Lua script does not
+	// apply the store's defaults to it.
+	originSet = "set"
 
 	// weekSeconds is the number of seconds in a week.
 	weekSeconds = 60 * 60 * 24 * 7
@@ -42,6 +47,11 @@ type Store struct {
 
 // Config is used as input to New. It defines the behavior of the storage
 // system.
+//
+// Tokens and Interval apply to every key that was not configured with Set,
+// including keys that a store with different values created earlier. Such a
+// key takes over the new values on its next Take: a lower limit applies
+// immediately, a higher limit from the next interval.
 type Config struct {
 	// Tokens is the number of tokens to allow per interval. The default value is
 	// 1.
@@ -208,6 +218,7 @@ func (s *Store) Set(ctx context.Context, key string, tokens uint64, interval tim
 		fieldTokens, tokensStr,
 		fieldMaxTokens, tokensStr,
 		fieldInterval, intervalStr,
+		fieldOrigin, originSet,
 	); err != nil {
 		retErr = fmt.Errorf("failed to set key: %w", err)
 		return
