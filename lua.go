@@ -9,6 +9,7 @@ local F_TICK     = 't'
 local F_INTERVAL = 'i'
 local F_TOKENS   = 'k'
 local F_MAX      = 'm'
+local F_ORIGIN   = 'o'
 
 -- speed up access to next
 local next = next
@@ -16,8 +17,9 @@ local next = next
 -- get arguments
 local key          = KEYS[1]
 local now          = tonumber(ARGV[1]) -- current unix time in nanoseconds
-local defmaxtokens = tonumber(ARGV[2]) -- default tokens per interval, only used if no value already exists for the key
-local definterval  = tonumber(ARGV[3]) -- interval in nanoseconds, only used if no value already exists for the key
+local defmaxtokens = tonumber(ARGV[2]) -- default tokens per interval, used unless the key was configured with Set
+local definterval  = tonumber(ARGV[3]) -- default interval in nanoseconds, used unless the key was configured with Set
+local deforigin    = ARGV[2] .. ':' .. ARGV[3]
 
 -- hgetall gets all the fields as a lua table.
 local hgetall = function (key)
@@ -89,7 +91,10 @@ local maxtokens = defmaxtokens
 if present(data[F_MAX]) then
   maxtokens = tonumber(data[F_MAX])
 else
-  redis.call(C_HSET, key, F_MAX, defmaxtokens)
+  redis.call(C_HSET, key,
+    F_MAX, defmaxtokens,
+    F_INTERVAL, definterval,
+    F_ORIGIN, deforigin)
   redis.call(C_EXPIRE, key, 30)
 end
 
@@ -101,6 +106,49 @@ end
 local interval = definterval
 if present(data[F_INTERVAL]) then
   interval = tonumber(data[F_INTERVAL])
+end
+
+-- origin holds the defaults the key was created with, as "<max>:<interval>". A
+-- key follows the store defaults only while its values still match its origin,
+-- which Set breaks.
+local originmax, origininterval
+if present(data[F_ORIGIN]) then
+  originmax, origininterval = string.match(data[F_ORIGIN], '^(%d+):(%d+)$')
+  originmax, origininterval = tonumber(originmax), tonumber(origininterval)
+end
+
+if originmax == maxtokens and origininterval == interval then
+  if maxtokens ~= defmaxtokens or interval ~= definterval then
+    -- ticks were counted in the old interval, so restart the count at the last
+    -- refill.
+    start = start + (lasttick * interval)
+    lasttick = 0
+    maxtokens = defmaxtokens
+    interval = definterval
+
+    -- never add tokens here: stores with different defaults can share a key
+    -- during a rolling deploy and switch it on every take, which would refill
+    -- it every time.
+    if tokens > maxtokens then
+      tokens = maxtokens
+    end
+
+    redis.call(C_HSET, key,
+      F_START, start,
+      F_TICK, lasttick,
+      F_INTERVAL, interval,
+      F_TOKENS, tokens,
+      F_MAX, maxtokens,
+      F_ORIGIN, deforigin)
+    redis.call(C_EXPIRE, key, ttl(interval))
+  end
+elseif present(data[F_MAX]) and not present(data[F_ORIGIN])
+  and maxtokens == defmaxtokens and interval == definterval then
+  -- a key without an origin predates the field. Adopt it only when it matches
+  -- the defaults, since anything else could come from Set.
+  redis.call(C_HSET, key,
+    F_INTERVAL, interval,
+    F_ORIGIN, deforigin)
 end
 
 local currtick = tick(start, now, interval)
